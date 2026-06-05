@@ -26,11 +26,18 @@ async function run() {
     const JobSphere = client.db('JobSphere');
     const jobDataCollection = JobSphere.collection('jobData');
 
+    // Post Api jobs
+    app.post('/api/jobs', async (req, res) => {
+      const newJob = req.body;
+      const result = await jobDataCollection.insertOne(newJob);
+      res.send(result);
+    });
+
     console.log(
       'Pinged your deployment. You successfully connected to MongoDB!',
     );
   } finally {
-    await client.close();
+    // await client.close();
   }
 }
 run().catch(console.dir);
