@@ -25,12 +25,59 @@ async function run() {
     // Mongodb Data Collection
     const JobSphere = client.db('JobSphere');
     const jobDataCollection = JobSphere.collection('jobData');
+    const companyCollection = JobSphere.collection('company');
 
     // Post Api jobs
     app.post('/api/jobs', async (req, res) => {
       const newJob = req.body;
       const result = await jobDataCollection.insertOne(newJob);
       res.send(result);
+    });
+
+    // company information Post api
+    app.post('/api/company', async (req, res) => {
+      try {
+        const newCompany = req.body;
+
+        const result = await companyCollection.insertOne(newCompany);
+
+        res.status(201).json({
+          success: true,
+          message: 'Company created successfully',
+          insertedId: result.insertedId,
+          data: {
+            ...newCompany,
+            _id: result.insertedId,
+          },
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to create company',
+          error: error.message,
+        });
+      }
+    });
+
+    app.get('/api/recruiter/company/:id', async (req, res) => {
+      try {
+        const recruiterId = req.params.id;
+
+        const companies = await companyCollection
+          .find({ recruiterId: recruiterId })
+          .toArray();
+
+        res.status(200).json({
+          success: true,
+          data: companies,
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch companies',
+          error: error.message,
+        });
+      }
     });
 
     console.log(
