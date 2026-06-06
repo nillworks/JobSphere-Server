@@ -27,14 +27,77 @@ async function run() {
     const jobDataCollection = JobSphere.collection('jobData');
     const companyCollection = JobSphere.collection('company');
 
-    // Post Api jobs
+    // Get All Jobs API
+    app.get('/api/jobs', async (req, res) => {
+      try {
+        const result = await jobDataCollection.find().toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to fetch jobs',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get limit 8 Jobs API
+    app.get('/api/jobs/limit', async (req, res) => {
+      try {
+        const result = await jobDataCollection.find().limit(8).toArray();
+
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to fetch jobs',
+          error: error.message,
+        });
+      }
+    });
+
+    // Get All Company API
+    app.get('/api/company', async (req, res) => {
+      try {
+        const result = await companyCollection.find().toArray();
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to fetch jobs',
+          error: error.message,
+        });
+      }
+    });
+
+    // Recruiter jobs Filter Get Api
+    app.get('/api/recruiter/job/:id', async (req, res) => {
+      try {
+        const userId = req.params.id;
+
+        const jobs = await jobDataCollection.find({ userId: userId }).toArray();
+
+        res.status(200).json({
+          success: true,
+          data: jobs,
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          message: 'Failed to fetch companies',
+          error: error.message,
+        });
+      }
+    });
+
+    //  Recruiter jobs Post Api
     app.post('/api/jobs', async (req, res) => {
       const newJob = req.body;
       const result = await jobDataCollection.insertOne(newJob);
       res.send(result);
     });
 
-    // company information Post api
+    // Recruiter company information Post api
     app.post('/api/company', async (req, res) => {
       try {
         const newCompany = req.body;
@@ -59,6 +122,7 @@ async function run() {
       }
     });
 
+    // Recruiter company  filter information Get api
     app.get('/api/recruiter/company/:id', async (req, res) => {
       try {
         const recruiterId = req.params.id;
