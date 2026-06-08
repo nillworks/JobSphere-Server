@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 const dotEnv = require('dotenv');
 const port = process.env.PORT || 8000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 dotEnv.config();
 app.use(cors());
@@ -19,8 +19,8 @@ const client = new MongoClient(process.env.MONGODB_URI, {
 
 async function run() {
   try {
-    await client.connect();
-    await client.db('admin').command({ ping: 1 });
+    // await client.connect();
+    // await client.db('admin').command({ ping: 1 });
 
     // Mongodb Data Collection
     const JobSphere = client.db('JobSphere');
@@ -36,6 +36,24 @@ async function run() {
         res.status(500).send({
           success: false,
           message: 'Failed to fetch jobs',
+          error: error.message,
+        });
+      }
+    });
+
+    // get Single Jobs
+    app.get('/api/job-details/:id', async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const query = { _id: new ObjectId(id) };
+        const result = await jobDataCollection.findOne(query);
+
+        res.status(200).send(result);
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to fetch job',
           error: error.message,
         });
       }
