@@ -26,6 +26,8 @@ async function run() {
     const JobSphere = client.db('JobSphere');
     const jobDataCollection = JobSphere.collection('jobData');
     const companyCollection = JobSphere.collection('company');
+    const applicationCollection = JobSphere.collection('application');
+    const planCollection = JobSphere.collection('plans');
 
     // Get All Jobs API
     app.get('/api/jobs', async (req, res) => {
@@ -160,6 +162,62 @@ async function run() {
           error: error.message,
         });
       }
+    });
+
+    // get application related apis
+    app.get('/api/application', async (req, res) => {
+      const applicantId = req.query.applicantId;
+      console.log(applicantId);
+
+      const result = await applicationCollection
+        .find({ applicantId })
+        .toArray();
+
+      res.send(result);
+    });
+
+    // Apply Post New
+    app.post('/api/application', async (req, res) => {
+      try {
+        const application = req.body;
+        const newApplication = {
+          ...application,
+          createdAt: new Date(),
+        };
+
+        if (!newApplication) {
+          return res.status(400).send({
+            success: false,
+            message: 'Application data is required',
+          });
+        }
+
+        const result = await applicationCollection.insertOne(newApplication);
+
+        res.status(201).send({
+          success: true,
+          message: 'Application submitted successfully',
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        res.status(500).send({
+          success: false,
+          message: 'Failed to submit application',
+          error: error.message,
+        });
+      }
+    });
+
+    app.get('/api/plans', async (req, res) => {
+      const query = {};
+
+      if (req.query.plan_id) {
+        query.id = req.query.plan_id;
+      }
+
+      const plan = await planCollection.findOne(query);
+
+      res.send(plan);
     });
 
     console.log(
