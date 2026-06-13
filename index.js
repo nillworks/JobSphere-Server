@@ -28,6 +28,8 @@ async function run() {
     const companyCollection = JobSphere.collection('company');
     const applicationCollection = JobSphere.collection('application');
     const planCollection = JobSphere.collection('plans');
+    const subscriptionsCollection = JobSphere.collection('subscriptions');
+    const userCollection = JobSphere.collection('user');
 
     // Get All Jobs API
     app.get('/api/jobs', async (req, res) => {
@@ -208,16 +210,43 @@ async function run() {
       }
     });
 
+    // Plans Get filter user Id
     app.get('/api/plans', async (req, res) => {
       const query = {};
 
       if (req.query.plan_id) {
-        query.id = req.query.plan_id;
+        query.plan_id = req.query.plan_id;
       }
 
       const plan = await planCollection.findOne(query);
 
       res.send(plan);
+    });
+
+    // subscriptions
+    app.post('/api/subscriptions', async (req, res) => {
+      const data = req.body;
+
+      const subsInfo = {
+        ...data,
+        createdAt: new Date(),
+      };
+
+      const result = await subscriptionsCollection.insertOne(subsInfo);
+
+      const filter = { email: data.email };
+      const updateDocument = {
+        $set: {
+          plan: data.planId,
+        },
+      };
+
+      const upDateResult = await userCollection.updateOne(
+        filter,
+        updateDocument,
+      );
+
+      res.send(upDateResult);
     });
 
     console.log(
