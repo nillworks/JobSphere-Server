@@ -30,6 +30,57 @@ async function run() {
     const planCollection = JobSphere.collection('plans');
     const subscriptionsCollection = JobSphere.collection('subscriptions');
     const userCollection = JobSphere.collection('user');
+    const sessionCollection = JobSphere.collection('session');
+
+    const verifyToken = async (req, res, next) => {
+      const authHeader = req?.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+      const token = authHeader.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      try {
+        // const { payload } = await jwtVerify(token, JWKS);
+        // console.log(payload);
+
+        const query = { token: token };
+        const session = await sessionCollection.findOne(query);
+
+        const userId = session.userId;
+        const userQuery = { _id: userId };
+
+        const user = await userCollection.findOne(userQuery);
+
+        req.user = user;
+
+        next();
+      } catch (error) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+    };
+
+    const verifySeeker = async (req, res, next) => {
+      if (req.user?.role !== 'seeker') {
+        return res.status(403).send({ massage: 'forbidden access' });
+      }
+      next();
+    };
+
+    const verifyRecruiter = async (req, res, next) => {
+      if (req.user?.role !== 'recruiter') {
+        return res.status(403).send({ massage: 'forbidden access' });
+      }
+      next();
+    };
+    const verifyAdmin = async (req, res, next) => {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).send({ massage: 'forbidden access' });
+      }
+      next();
+    };
 
     // Get All Jobs API
     app.get('/api/jobs', async (req, res) => {
@@ -46,7 +97,7 @@ async function run() {
     });
 
     // get Single Jobs
-    app.get('/api/job-details/:id', async (req, res) => {
+    app.get('/api/job-details/:id', verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -79,10 +130,19 @@ async function run() {
     });
 
     // Get All Company API
-    app.get('/api/company', async (req, res) => {
+    app.get('/api/company', verifyToken, verifyAdmin, async (req, res) => {
       try {
-        const result = await companyCollection.find().toArray();
-        res.status(200).send(result);
+        const companies = await companyCollection.find().toArray();
+
+        for (const company of companies) {
+          const filter = {
+            companyId: company._id.toString(),
+          };
+          const jobCount = await jobDataCollection.countDocuments(filter);
+          company.jobCount = jobCount;
+        }
+
+        res.status(200).send(companies);
       } catch (error) {
         res.status(500).send({
           success: false,
@@ -93,24 +153,31 @@ async function run() {
     });
 
     // Recruiter jobs Filter Get Api
-    app.get('/api/recruiter/job/:id', async (req, res) => {
-      try {
-        const userId = req.params.id;
+    app.get(
+      '/api/recruiter/job/:id',
+      verifyToken,
+      verifyRecruiter,
+      async (req, res) => {
+        try {
+          const userId = req.params.id;
 
-        const jobs = await jobDataCollection.find({ userId: userId }).toArray();
+          const jobs = await jobDataCollection
+            .find({ userId: userId })
+            .toArray();
 
-        res.status(200).json({
-          success: true,
-          data: jobs,
-        });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          message: 'Failed to fetch companies',
-          error: error.message,
-        });
-      }
-    });
+          res.status(200).json({
+            success: true,
+            data: jobs,
+          });
+        } catch (error) {
+          res.status(500).json({
+            success: false,
+            message: 'Failed to fetch companies',
+            error: error.message,
+          });
+        }
+      },
+    );
 
     //  Recruiter jobs Post Api
     app.post('/api/jobs', async (req, res) => {
@@ -144,36 +211,70 @@ async function run() {
       }
     });
 
+    // update admin Company Approve or reject
+    app.patch(
+      '/api/company/:id',
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+
+        const filter = { _id: new ObjectId(id) };
+        const updatedCompany = req.body;
+
+        const updateDoc = {
+          $set: {
+            status: updatedCompany.status,
+          },
+        };
+
+        const result = await companyCollection.updateOne(filter, updateDoc);
+
+        res.send(result);
+      },
+    );
+
     // Recruiter company  filter information Get api
-    app.get('/api/recruiter/company/:id', async (req, res) => {
-      try {
-        const recruiterId = req.params.id;
+    app.get(
+      '/api/recruiter/company/:id',
+      verifyToken,
+      verifyRecruiter,
+      async (req, res) => {
+        try {
+          const recruiterId = req.params.id;
 
-        const companies = await companyCollection
-          .find({ recruiterId: recruiterId })
-          .toArray();
+          const companies = await companyCollection
+            .find({ recruiterId: recruiterId })
+            .toArray();
 
-        res.status(200).json({
-          success: true,
-          data: companies,
-        });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          message: 'Failed to fetch companies',
-          error: error.message,
-        });
-      }
-    });
+          res.status(200).json({
+            success: true,
+            data: companies,
+          });
+        } catch (error) {
+          res.status(500).json({
+            success: false,
+            message: 'Failed to fetch companies',
+            error: error.message,
+          });
+        }
+      },
+    );
 
     // get application related apis
-    app.get('/api/application', async (req, res) => {
-      const applicantId = req.query.applicantId;
-      console.log(applicantId);
+    app.get('/api/application', verifyToken, verifySeeker, async (req, res) => {
+      const query = {};
+      if (req.query.applicantId) {
+        query.applicantId = req.query.applicantId;
 
-      const result = await applicationCollection
-        .find({ applicantId })
-        .toArray();
+        if (req.user._id.toString() !== req.query.applicantId) {
+          return res.status(403).send({ message: 'forbidden access' });
+        }
+      }
+      // const applicantId = req.query.applicantId;
+      // console.log(applicantId);
+
+      const result = await applicationCollection.find(query).toArray();
 
       res.send(result);
     });
@@ -220,7 +321,7 @@ async function run() {
 
       const plan = await planCollection.findOne(query);
 
-      res.send(plan);
+      res.send(plan || {});
     });
 
     // subscriptions
